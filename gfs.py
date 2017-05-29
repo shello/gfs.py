@@ -432,13 +432,28 @@ def main():
                              "the standard input; '-' is interpreted as "
                              "the standard input.")
 
+    keep_group = parser.add_mutually_exclusive_group()
+    keep_group.add_argument('--keep', '-k',
+                            action="store_true", dest="keep", default=True,
+                            help="Output the dates to keep in the rotation.")
+    keep_group.add_argument('--remove', '-r',
+                            action="store_false", dest="keep", default=True,
+                            help="Output the dates to remove from the "
+                                 "rotation.")
+
     args = parser.parse_args()
 
     gfs = GFS(date_format=args.date_format,
               cycles={c: v for c, v in args.cycles})
 
-    dates = [line.strip() for line in args.file.readlines()]
-    final_dates = gfs.gfs_filter(dates=dates)
+    dates = set(line.strip() for line in args.file.readlines())
+    filtered_dates = set(gfs.gfs_filter(dates=dates))
+
+    if args.keep:
+        final_dates = filtered_dates
+    else:
+        final_dates = dates - filtered_dates
+
     print('\n'.join(final_dates))
 
 
