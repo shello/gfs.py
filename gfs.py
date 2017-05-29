@@ -384,4 +384,66 @@ class SortedLimitedSet(SortedLimitedList):
             super().insert(value, _key=key, _index=idx)
 
 
+def main():
+    """Main CLI function for the GFS module."""
+    parser = argparse.ArgumentParser(
+        description="Filter dates using the Grandfather-father-son rotation "
+                    "scheme.")
 
+    def arg_type_cycle(raw):
+        """Parse a keyword=value argument into a Cycle for argparse."""
+        try:
+            cycle, value = raw.split('=')
+            value = int(value)
+        except ValueError:
+            # Raised on failed str.split, or non-integer `value`
+            msg = "Cycles must be in the form <cycle_name>=<positive_int>, " \
+                  f"{raw} given."
+            raise argparse.ArgumentTypeError(msg)
+
+        keyword = cycle.lower()
+
+        if keyword not in GFS.KEYWORD_CYCLES:
+            msg = f"Undefined cycle {cycle}: {raw}"
+            raise argparse.ArgumentTypeError(msg)
+
+        if value < 1:
+            msg = f"Value for cycle {cycle} is not a positive integer: {raw}"
+            raise argparse.ArgumentTypeError(msg)
+
+        return (GFS.KEYWORD_CYCLES[keyword], value)
+
+    parser.add_argument('cycles',
+                        nargs='+', type=arg_type_cycle, metavar="cycle=value",
+                        help="Set one or more cycles used for rotation, e.g., "
+                             "daily=14.")
+
+    parser.add_argument('--date-format', '-d',
+                        default='%Y-%m-%dT%H:%M:%S',
+                        metavar="FORMAT",
+                        help="Date format to use to parse the dates (in "
+                             "strftime(3) format). Default:"
+                             "%%Y-%%m-%%dT%%H:%%M:%%S")
+    # TODO validate date format
+
+    parser.add_argument('--file', '-f', type=argparse.FileType('r'),
+                        default=sys.stdin, nargs=1, metavar="FILENAME",
+                        help="Use filename to read a list of dates instead of "
+                             "the standard input; '-' is interpreted as "
+                             "the standard input.")
+
+    args = parser.parse_args()
+
+    gfs = GFS(date_format=args.date_format,
+              cycles={c: v for c, v in args.cycles})
+
+    dates = [line.strip() for line in args.file.readlines()]
+    final_dates = gfs.gfs_filter(dates=dates)
+    print('\n'.join(final_dates))
+
+
+if __name__ == '__main__':
+    import argparse
+    import sys
+
+    main()
