@@ -205,7 +205,7 @@ class GFS(_GFS):
             elif arg in ('yearly', 'year'):
                 cycle = YEARLY
             else:
-                raise PolicyNotImplemented(f"Policy not available: {kwarg}.")
+                raise NotImplementedError(f"Policy not available: {kwarg}.")
 
             cycles[cycle] = value
         return cycles
@@ -376,7 +376,4 @@ class SortedLimitedSet(SortedLimitedList):
             super().insert(value, _key=key, _index=idx)
 
 
-class PolicyNotImplemented(Exception):
-    """Raised when a required policy is not implemented."""
 
-    pass
