@@ -7,40 +7,72 @@ from datetime import datetime
 from typing import Callable, Coroutine, Hashable, Iterable, Mapping, Union
 
 
+class Cycle:
+    """A rotation cycle definition."""
+
+    def __init__(self, name: str, datetime_fmt_key: str):
+        """Create a named cycle with a datetime format string used as key."""
+        self.name = str(name)
+        self.key_fmt = str(datetime_fmt_key)
+
+    def __str__(self) -> str:
+        """Return an informal string representation of the cycle."""
+        return self.name
+
+    def __repr__(self) -> str:
+        """Return a printable representation of the cycle."""
+        return f"Cycle({self.name}, {self.key_fmt})"
+
+    def __eq__(self, other) -> bool:
+        """Compare this cycle to another."""
+        if type(self) is not type(other):
+            return False
+
+        return self.name == other.name and self.key_fmt == other.key_fmt
+
+    def __hash__(self) -> int:
+        """Return the hash value of the cycle object."""
+        return hash((self.name, self.key_fmt))
+
+    def key(self, date: datetime):
+        """Return the key value for a given datetime object."""
+        return format(date, self.key_fmt)
+
+
+# Helper cycles
+DAILY = Cycle("daily", "%Y-%m-%d")
+WEEKLY = Cycle("weekly", "%Y-%W")
+MONTHLY = Cycle("monthly", "%Y-%m")
+YEARLY = Cycle("yearly", "%Y")
+
+
 class _GFS():
     """Grandfather-father-son backup rotation scheme."""
 
-    # Type used to name a policy cycle
-    _Cycle = str
-
-    def __init__(self, **kwargs: Mapping[_Cycle, int]):
+    def __init__(self, cycles: Mapping[Cycle, int]):
         """Initialize the GFS class by passing a scheme of policy cycles."""
         self.policies = {}
-        self.keys = {}
-        for kwarg, value in kwargs.items():
+
+        for cycle, value in cycles.items():
             if value < 1:
-                raise ValueError("Policies only accept a positive value of"
-                                 f"cycles, {value} given for {kwarg}")
-
-            arg = kwarg.lower()
-
-            if arg in ('daily', 'day'):
-                cycle = 'daily'  # Type: _Cycle
-                key = '%Y-%m-%d'
-            elif arg in ('weekly', 'week'):
-                cycle = 'weekly'  # Type: _Cycle
-                key = '%Y-%W'
-            elif arg in ('monthly', 'month'):
-                cycle = 'monthly'  # Type: _Cycle
-                key = '%Y-%m'
-            elif arg in ('yearly', 'year'):
-                cycle = 'yearly'  # Type: _Cycle
-                key = '%Y'
-            else:
-                raise PolicyNotImplemented(f"Policy not available: {arg}.")
+                raise ValueError("Policies only accept a positive value of "
+                                 f"cycles, {value} given for {cycle}")
 
             self.policies[cycle] = value
-            self.keys[cycle] = self._formatted_date_key(key)
+
+        if not self.policies:
+            raise RuntimeError("GFS with no policy cycles")
+
+    def __eq__(self, other) -> bool:
+        """Compare the object with another."""
+        if type(self) is not type(other):
+            return False
+
+        return self.policies == other.policies
+
+    def __hash__(self) -> int:
+        """Return the hash of the GFS object."""
+        return hash(self.policies)
 
     @classmethod
     def _formatted_date_key(cls, fmt) -> Callable[[datetime], str]:
@@ -50,7 +82,7 @@ class _GFS():
         return inner
 
     def _gfs(self,
-             dates: Iterable[datetime]) -> Mapping[_Cycle, Iterable[datetime]]:
+             dates: Iterable[datetime]) -> Mapping[Cycle, Iterable[datetime]]:
         """Filter a list of candidate dates, returning the selected ones.
 
         >>> fmt = '%Y-%m-%dT%H:%M:%S'
@@ -65,9 +97,9 @@ class _GFS():
         ...        '2016-12-25T14:00:00',  # Previous year
         ...        '2015-12-30T13:00:00']  # Two years ago
         >>> dates = [datetime.strptime(d, fmt) for d in raw]
-        >>> my_gfs = _GFS(yearly=2, monthly=2, weekly=2, daily=2)
+        >>> my_gfs = _GFS({YEARLY: 2, MONTHLY: 2, WEEKLY: 2, DAILY: 2})
         >>> final = my_gfs._gfs(dates)
-        >>> {n: [format(d, fmt) for d in l] for n, l in final.items()}
+        >>> {str(c): [format(d, fmt) for d in ds] for c, ds in final.items()}
         ...     # doctest: +NORMALIZE_WHITESPACE
         {'yearly': ['2016-12-25T14:00:00', '2017-05-21T22:00:00'],
          'monthly': ['2017-04-30T16:00:00', '2017-05-21T22:00:00'],
@@ -107,7 +139,7 @@ class _GFS():
         ...        '2016-12-25T14:00:00',  # Previous year
         ...        '2015-12-30T13:00:00']  # Two years ago
         >>> dates = [datetime.strptime(d, fmt) for d in raw]
-        >>> my_gfs = _GFS(yearly=2, monthly=2, weekly=2, daily=2)
+        >>> my_gfs = _GFS({YEARLY: 2, MONTHLY: 2, WEEKLY: 2, DAILY: 2})
         >>> final = my_gfs.gfs_filter(dates)
         >>> [format(d, fmt) for d in sorted(final)]
         ...     # doctest: +NORMALIZE_WHITESPACE
@@ -125,10 +157,9 @@ class _GFS():
     # Aaargh, 80 cols!
     _Gfs_cycle_ret = Coroutine[None, Union[datetime, None], Iterable]
 
-    def _gfs_cycle(self, cycle: _Cycle) -> _Gfs_cycle_ret:
+    def _gfs_cycle(self, cycle: Cycle) -> _Gfs_cycle_ret:
         """Coroutine that evaluates every candidate sent, under this cycle."""
-        cycle_set = SortedLimitedSet(self.policies[cycle],
-                                     key=self.keys[cycle])
+        cycle_set = SortedLimitedSet(self.policies[cycle], key=cycle.key)
 
         date = yield
         while date:
@@ -142,14 +173,52 @@ class _GFS():
 class GFS(_GFS):
     """Grandfather-father-son backup rotation scheme."""
 
-    def __init__(self, date_format: str, **kwargs: Mapping[str, int]):
+    def __init__(self, date_format: str,
+                 cycles: Union[None, Mapping[Cycle, int]] = None,
+                 **kwargs: Mapping[str, int]):
         """Create a Grandfather-father-son backup rotation scheme helper."""
         self.fmt = date_format
 
-        super().__init__(**kwargs)
+        if cycles is None and kwargs:
+            cycles = GFS.parse_keyword_cycles(**kwargs)
+
+        super().__init__(cycles=cycles)
+
+    @classmethod
+    def parse_keyword_cycles(cls, **kwargs: Mapping[str, int]):
+        """Parse keyword arguments and turn them into a cycle->int mapping.
+
+        >>> fmt = '%Y-%m-%dT%H:%M:%S'
+        >>> gfs_kw = GFS(fmt, daily=1, weekly=2, monthly=3, yearly=4)
+        >>> gfs_map = GFS(fmt, {DAILY: 1, WEEKLY: 2, MONTHLY: 3, YEARLY: 4})
+        >>> gfs_kw == gfs_map
+        True
+        >>> GFS(fmt, daily=1) == GFS(fmt, {DAILY: 2})
+        False
+        >>> GFS(fmt, daily=1) == GFS(fmt, {WEEKLY: 1})
+        False
+        """
+        cycles = {}
+
+        for kwarg, value in kwargs.items():
+            arg = kwarg.lower()
+
+            if arg in ('daily', 'day'):
+                cycle = DAILY
+            elif arg in ('weekly', 'week'):
+                cycle = WEEKLY
+            elif arg in ('monthly', 'month'):
+                cycle = MONTHLY
+            elif arg in ('yearly', 'year'):
+                cycle = YEARLY
+            else:
+                raise PolicyNotImplemented(f"Policy not available: {kwarg}.")
+
+            cycles[cycle] = value
+        return cycles
 
     def _gfs(self,
-             dates: Iterable[str]) -> Mapping[_GFS._Cycle, Iterable[datetime]]:
+             dates: Iterable[str]) -> Mapping[Cycle, Iterable[datetime]]:
         """Filter a list of candidate dates, returning the selected ones.
 
         >>> fmt = '%Y-%m-%dT%H:%M:%S'
@@ -163,8 +232,10 @@ class GFS(_GFS):
         ...          '2017-04-23T15:00:00',
         ...          '2016-12-25T14:00:00',  # Previous year
         ...          '2015-12-30T13:00:00']  # Two years ago
-        >>> my_gfs = GFS(fmt, yearly=2, monthly=2, weekly=2, daily=2)
-        >>> my_gfs._gfs(dates)  # doctest: +NORMALIZE_WHITESPACE
+        >>> my_gfs = GFS(fmt, {YEARLY: 2, MONTHLY: 2, WEEKLY: 2, DAILY: 2})
+        >>> final = my_gfs._gfs(dates)
+        >>> {str(c): ds for c, ds in final.items()}
+        ...     # doctest: +NORMALIZE_WHITESPACE
         {'yearly': ['2016-12-25T14:00:00', '2017-05-21T22:00:00'],
          'monthly': ['2017-04-30T16:00:00', '2017-05-21T22:00:00'],
          'weekly': ['2017-05-14T19:00:00', '2017-05-21T22:00:00'],
