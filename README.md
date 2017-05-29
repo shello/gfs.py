@@ -20,14 +20,14 @@ Example
 -------
 
 ```
-python3 gfs.py daily=14 weekly=4 montly=3 yearly=2
+./gfs.py daily=14 weekly=4 montly=3 yearly=2
 ```
 
 Usage
 -----
 
 ```
-$ python3 gfs.py --help
+$ ./gfs.py --help
 usage: gfs.py [-h] [--date-format FORMAT] [--file FILENAME]
               [--keep | --remove]
               cycle=value [cycle=value ...]
@@ -49,6 +49,8 @@ optional arguments:
                         input.
   --keep, -k            Output the dates to keep in the rotation.
   --remove, -r          Output the dates to remove from the rotation.
+
+Available cycles: daily, day, weekly, week, monthly, month, yearly, year
 ```
 
 License
