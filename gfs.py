@@ -74,13 +74,6 @@ class _GFS():
         """Return the hash of the GFS object."""
         return hash(self.policies)
 
-    @classmethod
-    def _formatted_date_key(cls, fmt) -> Callable[[datetime], str]:
-        """Generate a 'key' function for dates, based on a given format."""
-        def inner(date: datetime) -> str:
-            return format(date, fmt)
-        return inner
-
     def _gfs(self,
              dates: Iterable[datetime]) -> Mapping[Cycle, Iterable[datetime]]:
         """Filter a list of candidate dates, returning the selected ones.
