@@ -388,7 +388,8 @@ def main():
     """Main CLI function for the GFS module."""
     parser = argparse.ArgumentParser(
         description="Filter dates using the Grandfather-father-son rotation "
-                    "scheme.")
+                    "scheme.",
+        epilog="Available cycles: " + ', '.join(GFS.KEYWORD_CYCLES.keys()))
 
     def arg_type_cycle(raw):
         """Parse a keyword=value argument into a Cycle for argparse."""
