@@ -166,6 +166,21 @@ class _GFS():
 class GFS(_GFS):
     """Grandfather-father-son backup rotation scheme."""
 
+    # Named keyword cycles
+    KEYWORD_CYCLES = {
+        'daily': DAILY,
+        'day': DAILY,
+
+        'weekly': WEEKLY,
+        'week': WEEKLY,
+
+        'monthly': MONTHLY,
+        'month': MONTHLY,
+
+        'yearly': YEARLY,
+        'year': YEARLY
+    }
+
     def __init__(self, date_format: str,
                  cycles: Union[None, Mapping[Cycle, int]] = None,
                  **kwargs: Mapping[str, int]):
@@ -196,18 +211,11 @@ class GFS(_GFS):
         for kwarg, value in kwargs.items():
             arg = kwarg.lower()
 
-            if arg in ('daily', 'day'):
-                cycle = DAILY
-            elif arg in ('weekly', 'week'):
-                cycle = WEEKLY
-            elif arg in ('monthly', 'month'):
-                cycle = MONTHLY
-            elif arg in ('yearly', 'year'):
-                cycle = YEARLY
+            if arg in cls.KEYWORD_CYCLES:
+                cycles[cls.KEYWORD_CYCLES[arg]] = value
             else:
                 raise NotImplementedError(f"Policy not available: {kwarg}.")
 
-            cycles[cycle] = value
         return cycles
 
     def _gfs(self,
