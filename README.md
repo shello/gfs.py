@@ -20,8 +20,20 @@ Example
 -------
 
 ```
-./gfs.py daily=14 weekly=4 montly=3 yearly=2
+./gfs.py daily=14 weekly=4 montly=3 yearly=2 <dates.txt
 ```
+
+This command will read a list of dates from `dates.txt`, and will filter it by
+the given set of policies, keeping only the latest date that fits in a maximum
+number of slots (or groupings) for each cycle:
+
+- 14 slots of daily dates
+- 4 slots of weekly dates
+- 3 slots of monthly dates
+- 2 slots of yearly dates
+
+The new list of dates is printed to the standard output (i.e. the terminal
+window, when using an interactive terminal).
 
 Usage
 -----
