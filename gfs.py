@@ -164,7 +164,7 @@ class _GFS():
 
 
 class GFS(_GFS):
-    """Grandfather-father-son backup rotation scheme."""
+    """Lax implementation of GFS, allowing for string cycles and dates."""
 
     # Named keyword cycles
     KEYWORD_CYCLES = {
@@ -242,6 +242,8 @@ class GFS(_GFS):
          'weekly': ['2017-05-14T19:00:00', '2017-05-21T22:00:00'],
          'daily': ['2017-05-20T20:00:00', '2017-05-21T22:00:00']}
         """
+        # Conver the string dates to datetime objects, passing them to the main
+        # GFS implementation, and then convert them back using the same format.
         result = super()._gfs(self._str_to_date(dates))
         return {c: list(self._date_to_str(s)) for c, s in result.items()}
 
