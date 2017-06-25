@@ -241,19 +241,46 @@ class GFS(_GFS):
          'monthly': ['2017-04-30T16:00:00', '2017-05-21T22:00:00'],
          'weekly': ['2017-05-14T19:00:00', '2017-05-21T22:00:00'],
          'daily': ['2017-05-20T20:00:00', '2017-05-21T22:00:00']}
+
+        Wrong date format:
+
+        >>> bad_dates = ['2017-05-31T12:00:00',
+        ...              '2017-06-01X13:00:00',  # Bad format!
+        ...              '2017-06-02T10:00:00']
+        >>> my_gfs._gfs(bad_dates)  # doctest: +ELLIPSIS
+        Traceback (most recent call last):
+        ValueError: Invalid date 2017-06-01X13:00:00: ...
         """
         # Conver the string dates to datetime objects, passing them to the main
         # GFS implementation, and then convert them back using the same format.
         result = super()._gfs(self._str_to_date(dates))
         return {c: list(self._date_to_str(s)) for c, s in result.items()}
 
+    def _parse_date(self, str_date: str) -> datetime:
+        """Parse a string date to a datetime object.
+
+        This "wrapper" function to datetime.strptime is necessary because in
+        some cases the ValueError exception doesn't report back the offending
+        date in its message, such as "day is out of range for month".
+        Unfortunately it will repeat the date in other cases, such as "time
+        data '...' does not match format '...'"."""
+        try:
+            return datetime.strptime(str_date, self.fmt)
+        except ValueError as e:
+            msg = f"Invalid date {str_date}: {e}."
+            raise ValueError(msg) from e
+
     def _str_to_date(self, str_dates: Iterable[str]) -> Iterable[datetime]:
         """A generator that yields datetime from strings."""
-        yield from map(lambda s: datetime.strptime(s, self.fmt), str_dates)
+        yield from map(self._parse_date, str_dates)
+
+    def _format_date(self, date: datetime) -> str:
+        """Format a datetime object into a string date."""
+        return format(date, self.fmt)
 
     def _date_to_str(self, dates: Iterable[datetime]) -> Iterable[str]:
         """A generator that yields strings from datetime."""
-        yield from map(lambda d: format(d, self.fmt), dates)
+        yield from map(self._format_date, dates)
 
 
 class SortedLimitedList(collections.abc.Iterable):
@@ -427,7 +454,6 @@ def main():
                         help="Date format to use to parse the dates (in "
                              "strftime(3) format). Default:"
                              "%%Y-%%m-%%dT%%H:%%M:%%S")
-    # TODO validate date format
 
     parser.add_argument('--file', '-f', type=argparse.FileType('r'),
                         default=sys.stdin, nargs=1, metavar="FILENAME",
@@ -450,7 +476,17 @@ def main():
               cycles={c: v for c, v in args.cycles})
 
     dates = set(line.strip() for line in args.file.readlines())
-    filtered_dates = set(gfs.gfs_filter(dates=dates))
+
+    try:
+        gfs_dates = gfs.gfs_filter(dates=dates)
+    except ValueError as e:
+        # Invalid date/parsing found, abort.
+        program_name = sys.argv[0]
+        print(f"{program_name}: Error: {e}", file=sys.stderr)
+
+        exit(1)
+
+    filtered_dates = set(gfs_dates)
 
     if args.keep:
         final_dates = filtered_dates
