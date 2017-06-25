@@ -1,4 +1,4 @@
-`GFS.py`
+`gfs.py`
 ========
 
 Python 3 implementation of a date-based [Grandfather-father-son backup rotation
