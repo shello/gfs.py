@@ -493,7 +493,8 @@ def main():
     else:
         final_dates = dates - filtered_dates
 
-    print(*final_dates, sep="\n")
+    if final_dates:
+        print(*final_dates, sep="\n")
 
 
 if __name__ == '__main__':
