@@ -456,7 +456,7 @@ def main():
                              "%%Y-%%m-%%dT%%H:%%M:%%S")
 
     parser.add_argument('--file', '-f', type=argparse.FileType('r'),
-                        default=sys.stdin, nargs=1, metavar="FILENAME",
+                        default=sys.stdin, metavar="FILENAME",
                         help="Use filename to read a list of dates instead of "
                              "the standard input; '-' is interpreted as "
                              "the standard input.")
